@@ -1,0 +1,6 @@
+go 1.26.5
+
+use (
+	./modules/compilerms/_src/compilerms
+	./modules/trapseccomp/_src/trapseccomp
+)
