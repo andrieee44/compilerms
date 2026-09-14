@@ -32,7 +32,12 @@ func GCC(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error(r.URL.String(), "method", r.Method, "error", err)
 
-		if errors.Is(err, compilers.ErrInternal) {
+		switch {
+		case errors.Is(err, compilers.ErrBadRequest):
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+
+			return
+		case errors.Is(err, compilers.ErrInternal):
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 
 			return

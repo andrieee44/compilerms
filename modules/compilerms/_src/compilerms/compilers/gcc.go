@@ -10,8 +10,8 @@ import (
 )
 
 type GCCOpts struct {
-	Headers map[string]string `json:"headers"`
-	Sources map[string]string `json:"source"`
+	Headers map[string]string `json:"headers" validate:"omitzero,dive,keys,excludesrune=/,endkeys"`
+	Sources map[string]string `json:"sources" validate:"gt=0,dive,keys,excludesrune=/,endkeys"`
 	Stdin   string            `json:"stdin"`
 }
 
@@ -103,6 +103,11 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 		err                                     error
 	)
 
+	err = validate.Struct(opts)
+	if err != nil {
+		return Output{}, fmt.Errorf("%w: %w", ErrBadRequest, err)
+	}
+
 	tmpdir, deferFn, err = mkdirTemp("compilerms-gcc-*")
 	if err != nil {
 		return Output{}, fmt.Errorf("%w: %w", ErrInternal, err)
@@ -115,14 +120,14 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 		return Output{}, fmt.Errorf("%w: %w", ErrInternal, err)
 	}
 
-	err = mkdirFiles(filepath.Join(tmpdir, "source"), opts.Sources)
+	err = mkdirFiles(filepath.Join(tmpdir, "sources"), opts.Sources)
 	if err != nil {
 		return Output{}, fmt.Errorf("%w: %w", ErrInternal, err)
 	}
 
 	sources = make([]string, 0, len(opts.Sources))
 	for source = range opts.Sources {
-		sources = append(sources, filepath.Join("/", "source", source))
+		sources = append(sources, filepath.Join("/", "sources", source))
 	}
 
 	compilerBPF = filepath.Join(tmpdir, "compiler.bpf")
