@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/andrieee44/compilerms/modules/compilerms/_src/compilerms/compilers"
 	"github.com/andrieee44/compilerms/modules/compilerms/_src/compilerms/handlers"
 )
 
@@ -25,7 +26,8 @@ func run() error {
 	address = os.Args[1]
 
 	mux = http.NewServeMux()
-	mux.HandleFunc("POST /gcc", handlers.GCC)
+	mux.Handle("POST /gcc", handlers.NewCompilerHandler(compilers.GCC))
+	mux.Handle("POST /java", handlers.NewCompilerHandler(compilers.Java))
 
 	srv = &http.Server{
 		Addr:    address,

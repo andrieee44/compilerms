@@ -53,6 +53,7 @@ var (
 		"unlink":          {},
 		"vfork":           {},
 		"wait4":           {},
+		"waitid":          {},
 		"write":           {},
 	}
 
@@ -91,6 +92,8 @@ var (
 		"wait4":           {},
 		"write":           {},
 		"writev":          {},
+		"readlinkat":      {},
+		"ioctl":           {},
 	}
 )
 
@@ -110,19 +113,19 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 
 	tmpdir, deferFn, err = mkdirTemp("compilerms-gcc-*")
 	if err != nil {
-		return Output{}, fmt.Errorf("%w: %w", ErrInternal, err)
+		return Output{}, err
 	}
 
 	defer deferFn()
 
 	err = mkdirFiles(filepath.Join(tmpdir, "include"), opts.Headers)
 	if err != nil {
-		return Output{}, fmt.Errorf("%w: %w", ErrInternal, err)
+		return Output{}, err
 	}
 
 	err = mkdirFiles(filepath.Join(tmpdir, "sources"), opts.Sources)
 	if err != nil {
-		return Output{}, fmt.Errorf("%w: %w", ErrInternal, err)
+		return Output{}, err
 	}
 
 	sources = make([]string, 0, len(opts.Sources))
@@ -133,13 +136,13 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 	compilerBPF = filepath.Join(tmpdir, "compiler.bpf")
 	err = writeSeccompBPF(compilerBPF, gccCompilerWhitelist)
 	if err != nil {
-		return Output{}, fmt.Errorf("%w: %w", ErrInternal, err)
+		return Output{}, err
 	}
 
 	programBPF = filepath.Join(tmpdir, "program.bpf")
 	err = writeSeccompBPF(programBPF, gccProgramWhitelist)
 	if err != nil {
-		return Output{}, fmt.Errorf("%w: %w", ErrInternal, err)
+		return Output{}, err
 	}
 
 	output, err = run(
@@ -176,23 +179,45 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 					--die-with-parent \
 					--new-session \
 					--unshare-all \
-					--chdir / \
-					--dev /dev \
 					--hostname compilerms \
-					--tmpfs /tmp \
 					--bind %s / \
-					--ro-bind /bin /bin \
+					--dev /dev \
+					--tmpfs /tmp \
 					--ro-bind /lib /lib \
 					--ro-bind /lib64 /lib64 \
-					--ro-bind /usr /usr \
-					--setenv PATH /usr/bin:/bin \
+					--ro-bind /usr/bin/as /usr/bin/as \
+					--ro-bind /usr/bin/gcc /usr/bin/gcc \
+					--ro-bind /usr/bin/ld /usr/bin/ld \
+					--ro-bind /usr/include /usr/include \
+					--ro-bind /usr/lib /usr/lib \
+					--ro-bind /usr/lib64 /usr/lib64 \
+					--chdir / \
+					--setenv PATH /usr/bin \
 					--setenv TMPDIR /tmp \
 					--seccomp 3 3< %s \
 					-- gcc \
+						-D_FORTIFY_SOURCE=3 \
+						-O1 \
 						-Wall \
+						-Wconversion \
+						-Wdouble-promotion \
+						-Wduplicated-branches \
+						-Wduplicated-cond \
 						-Werror \
 						-Wextra \
+						-Wformat=2 \
+						-Wlogical-op \
+						-Wmissing-prototypes \
+						-Wnull-dereference \
 						-Wpedantic \
+						-Wshadow \
+						-Wsign-conversion \
+						-Wundef \
+						-fno-omit-frame-pointer \
+						-fno-sanitize-recover=undefined \
+						-fsanitize=undefined \
+						-fstack-protector-strong \
+						-g \
 						-I /include \
 						-o /program \
 						%s
@@ -238,15 +263,16 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 					--die-with-parent \
 					--new-session \
 					--unshare-all \
-					--chdir / \
-					--dev /dev \
 					--hostname compilerms \
-					--tmpfs /tmp \
 					--bind %s / \
+					--dev /dev \
+					--proc /proc \
+					--tmpfs /tmp \
 					--ro-bind /lib /lib \
 					--ro-bind /lib64 /lib64 \
 					--ro-bind /usr/lib /usr/lib \
 					--ro-bind /usr/lib64 /usr/lib64 \
+					--chdir / \
 					--setenv TMPDIR /tmp \
 					--seccomp 3 3< %s \
 					-- /program
