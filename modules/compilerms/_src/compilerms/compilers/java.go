@@ -210,6 +210,7 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 					--tmpfs /tmp \
 					--ro-bind "$home/bin/javac" "$home/bin/javac" \
 					--ro-bind "$home/lib" "$home/lib" \
+					--ro-bind /lib /lib \
 					--ro-bind /lib64 /lib64 \
 					--ro-bind /usr/lib /usr/lib \
 					--ro-bind /usr/lib64 /usr/lib64 \
@@ -292,6 +293,7 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 					--tmpfs /tmp \
 					--ro-bind "$home/bin/java" "$home/bin/java" \
 					--ro-bind "$home/lib" "$home/lib" \
+					--ro-bind /lib /lib \
 					--ro-bind /lib64 /lib64 \
 					--ro-bind /usr/lib /usr/lib \
 					--ro-bind /usr/lib64 /usr/lib64 \
