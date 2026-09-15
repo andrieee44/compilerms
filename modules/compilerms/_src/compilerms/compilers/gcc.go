@@ -70,6 +70,7 @@ var (
 		"getpid":          {},
 		"getrandom":       {},
 		"gettid":          {},
+		"ioctl":           {},
 		"lseek":           {},
 		"madvise":         {},
 		"mmap":            {},
@@ -80,6 +81,7 @@ var (
 		"pread64":         {},
 		"prlimit64":       {},
 		"read":            {},
+		"readlinkat":      {},
 		"rseq":            {},
 		"rt_sigaction":    {},
 		"rt_sigprocmask":  {},
@@ -92,8 +94,6 @@ var (
 		"wait4":           {},
 		"write":           {},
 		"writev":          {},
-		"readlinkat":      {},
-		"ioctl":           {},
 	}
 )
 
@@ -215,8 +215,9 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 						-Wshadow \
 						-Wsign-conversion \
 						-Wundef \
+						-fanalyzer \
 						-fno-omit-frame-pointer \
-						-fno-sanitize-recover=undefined \
+						-fno-sanitize-recover=all \
 						-fsanitize=undefined \
 						-fstack-protector-strong \
 						-g \
