@@ -199,8 +199,10 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 				bwrap \
 					--clearenv \
 					--die-with-parent \
+					--disable-userns \
 					--new-session \
 					--unshare-all \
+					--unshare-user \
 					--hostname compilerms \
 					--bind %s / \
 					--dev /dev \
@@ -279,8 +281,10 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 				bwrap \
 					--clearenv \
 					--die-with-parent \
+					--disable-userns \
 					--new-session \
 					--unshare-all \
+					--unshare-user \
 					--hostname compilerms \
 					--bind %s / \
 					--dev /dev \
