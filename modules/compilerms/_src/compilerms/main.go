@@ -31,7 +31,7 @@ func run() error {
 
 	srv = &http.Server{
 		Addr:    address,
-		Handler: handlers.RateLimiter(mux),
+		Handler: handlers.CORS(handlers.RateLimiter(mux)),
 	}
 
 	srv.Protocols = new(http.Protocols)
