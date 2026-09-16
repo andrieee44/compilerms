@@ -3,6 +3,7 @@ package compilers
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -132,7 +133,6 @@ var (
 func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 	var (
 		tmpdir, source, compilerBPF, programBPF string
-		deferFn                                 func()
 		sources                                 []string
 		output                                  Output
 		err                                     error
@@ -143,12 +143,12 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 		return Output{}, fmt.Errorf("%w: %w", ErrBadRequest, err)
 	}
 
-	tmpdir, deferFn, err = mkdirTemp("compilerms-java-*")
+	tmpdir, err = mkdirTemp("compilerms-java-*")
 	if err != nil {
 		return Output{}, err
 	}
 
-	defer deferFn()
+	defer os.RemoveAll(tmpdir) //nolint:errcheck
 
 	err = mkdirFiles(filepath.Join(tmpdir, "sources"), opts.Sources)
 	if err != nil {

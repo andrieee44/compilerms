@@ -3,6 +3,7 @@ package compilers
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -100,7 +101,6 @@ var (
 func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 	var (
 		tmpdir, source, compilerBPF, programBPF string
-		deferFn                                 func()
 		sources                                 []string
 		output                                  Output
 		err                                     error
@@ -111,12 +111,12 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 		return Output{}, fmt.Errorf("%w: %w", ErrBadRequest, err)
 	}
 
-	tmpdir, deferFn, err = mkdirTemp("compilerms-gcc-*")
+	tmpdir, err = mkdirTemp("compilerms-gcc-*")
 	if err != nil {
 		return Output{}, err
 	}
 
-	defer deferFn()
+	defer os.RemoveAll(tmpdir) //nolint:errcheck
 
 	err = mkdirFiles(filepath.Join(tmpdir, "include"), opts.Headers)
 	if err != nil {

@@ -1,12 +1,11 @@
 package compilers
 
 import (
-	"log/slog"
 	"os"
 	"path/filepath"
 )
 
-func mkdirTemp(pattern string) (string, func(), error) {
+func mkdirTemp(pattern string) (string, error) {
 	var (
 		tmpdir string
 		err    error
@@ -14,17 +13,10 @@ func mkdirTemp(pattern string) (string, func(), error) {
 
 	tmpdir, err = os.MkdirTemp(os.TempDir(), pattern)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 
-	return tmpdir, func() {
-		var err error
-
-		err = os.RemoveAll(tmpdir)
-		if err != nil {
-			slog.Error("mkdirTemp", "error", err)
-		}
-	}, nil
+	return tmpdir, nil
 }
 
 func mkdirFiles(name string, files map[string]string) error {

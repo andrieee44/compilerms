@@ -2,5 +2,6 @@ go 1.26.5
 
 use (
 	./modules/compilerms/_src/compilerms
+	./modules/sqlite3tmp/_src/sqlite3tmp
 	./modules/trapseccomp/_src/trapseccomp
 )
