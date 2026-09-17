@@ -1,14 +1,25 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	sqlite "gosqlite.org"
 	sqlite3 "modernc.org/sqlite/lib"
 )
+
+type Output struct {
+	Statement string   `json:"statement"`
+	Columns   []string `json:"columns,omitempty"`
+	Rows      [][]any  `json:"rows,omitempty"`
+}
 
 var (
 	pragmas sqlite.Pragmas = sqlite.Pragmas{
@@ -52,11 +63,138 @@ func authorizer(op int, _, _, _, _ string) int {
 	}
 }
 
+func rawConnSetup(driverConn any) error {
+	var (
+		rawConn           *sqlite.Conn
+		dbConfigOp        sqlite.DBConfigOp
+		dbConfigEnable    bool
+		limitID, limitVal int
+		err               error
+	)
+
+	rawConn = driverConn.(*sqlite.Conn)
+	rawConn.RegisterAuthorizer(authorizer)
+
+	for dbConfigOp, dbConfigEnable = range dbConfigs {
+		_, err = rawConn.SetDBConfig(dbConfigOp, dbConfigEnable)
+		if err != nil {
+			return err
+		}
+	}
+
+	for limitID, limitVal = range limits {
+		rawConn.SetLimit(limitID, limitVal)
+	}
+
+	return nil
+}
+
+func readStatements(rd io.Reader) ([]string, error) {
+	var (
+		reader     *bufio.Reader
+		builder    strings.Builder
+		statements []string
+		statement  string
+		err        error
+	)
+
+	reader = bufio.NewReader(rd)
+
+	for {
+		for {
+			statement, err = reader.ReadString(';')
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					builder.WriteString(statement)
+					builder.WriteByte(';')
+
+					return append(statements, builder.String()), nil
+				}
+
+				return nil, err
+			}
+
+			builder.WriteString(statement)
+
+			if sqlite.Complete(builder.String()) {
+				break
+			}
+		}
+
+		statements = append(statements, builder.String())
+		builder.Reset()
+	}
+}
+
+func executeStatements(conn *sql.Conn, statements []string) ([]Output, error) {
+	var (
+		outputs          []Output
+		statement        string
+		output           Output
+		rows             *sql.Rows
+		rowPtrs, rowVals []any
+		i                int
+		err              error
+	)
+
+	outputs = make([]Output, 0, len(statements))
+
+	for _, statement = range statements {
+		output = Output{
+			Statement: statement,
+			Rows:      make([][]any, 0, len(statements)),
+		}
+
+		rows, err = conn.QueryContext(context.Background(), statement)
+		if err != nil {
+			return nil, err
+		}
+
+		output.Columns, err = rows.Columns()
+		if err != nil {
+			return nil, err
+		}
+
+		if len(output.Columns) == 0 {
+			outputs = append(outputs, output)
+
+			continue
+		}
+
+		for rows.Next() {
+			rowPtrs = make([]any, len(output.Columns))
+			rowVals = make([]any, len(output.Columns))
+
+			for i = range len(output.Columns) {
+				rowPtrs[i] = &rowVals[i]
+			}
+
+			err = rows.Scan(rowPtrs...)
+			if err != nil {
+				return nil, err
+			}
+
+			output.Rows = append(output.Rows, rowVals)
+		}
+
+		err = rows.Err()
+		if err != nil {
+			return nil, err
+		}
+
+		outputs = append(outputs, output)
+	}
+
+	return outputs, nil
+}
+
 func run() error {
 	var (
-		db   *sqlite.DB
-		conn *sql.Conn
-		err  error
+		db         *sqlite.DB
+		conn       *sql.Conn
+		statements []string
+		outputs    []Output
+		err        error
 	)
 
 	db, err = sqlite.Open(sqlite.Config{
@@ -71,50 +209,27 @@ func run() error {
 		return err
 	}
 
-	defer db.Close() //nolint:errcheck
-
 	conn, err = db.Conn(context.Background())
 	if err != nil {
 		return err
 	}
 
-	defer conn.Close() //nolint:errcheck
-
-	err = conn.Raw(func(driverConn any) error {
-		var (
-			c                 *sqlite.Conn
-			dbConfigOp        sqlite.DBConfigOp
-			enable            bool
-			limitID, limitVal int
-			err               error
-		)
-
-		c = driverConn.(*sqlite.Conn)
-		c.RegisterAuthorizer(authorizer)
-
-		err = c.EnableLoadExtension(false)
-		if err != nil {
-			return err
-		}
-
-		for dbConfigOp, enable = range dbConfigs {
-			_, err = c.SetDBConfig(dbConfigOp, enable)
-			if err != nil {
-				return err
-			}
-		}
-
-		for limitID, limitVal = range limits {
-			c.SetLimit(limitID, limitVal)
-		}
-
-		return nil
-	})
+	err = conn.Raw(rawConnSetup)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	statements, err = readStatements(os.Stdin)
+	if err != nil {
+		return err
+	}
+
+	outputs, err = executeStatements(conn, statements)
+	if err != nil {
+		return err
+	}
+
+	return json.NewEncoder(os.Stdout).Encode(outputs)
 }
 
 func main() {
@@ -125,6 +240,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, `sqlite3tmp: %v
 
 Usage: sqlite3tmp
+       echo SELECT 1 | sqlite3tmp
 `, err)
 
 		os.Exit(1)
