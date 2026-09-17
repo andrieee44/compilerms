@@ -16,9 +16,8 @@ import (
 )
 
 type Output struct {
-	Statement string   `json:"statement"`
-	Columns   []string `json:"columns,omitempty"`
-	Rows      [][]any  `json:"rows,omitempty"`
+	Columns []string `json:"columns,omitempty"`
+	Rows    [][]any  `json:"rows,omitempty"`
 }
 
 var (
@@ -155,10 +154,7 @@ func executeStatements(conn *sql.Conn, statements []string) ([]Output, error) {
 	outputs = make([]Output, 0, len(statements))
 
 	for _, statement = range statements {
-		output = Output{
-			Statement: statement,
-			Rows:      make([][]any, 0, len(statements)),
-		}
+		output = Output{}
 
 		rows, err = conn.QueryContext(context.Background(), statement)
 		if err != nil {
@@ -171,8 +167,6 @@ func executeStatements(conn *sql.Conn, statements []string) ([]Output, error) {
 		}
 
 		if len(output.Columns) == 0 {
-			outputs = append(outputs, output)
-
 			continue
 		}
 
