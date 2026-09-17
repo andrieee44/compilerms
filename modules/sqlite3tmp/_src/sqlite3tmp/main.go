@@ -51,16 +51,31 @@ var (
 )
 
 func authorizer(op int, _, _, _, _ string) int {
+	var opStr string
+
 	switch op {
-	case sqlite.SQLITE_PRAGMA,
-		sqlite.SQLITE_ATTACH,
-		sqlite.SQLITE_DETACH,
-		sqlite.SQLITE_CREATE_VTABLE,
-		sqlite.SQLITE_DROP_VTABLE:
-		return sqlite.SQLITE_DENY
+	case sqlite.SQLITE_PRAGMA:
+		opStr = "SQLITE_PRAGMA"
+	case sqlite.SQLITE_ATTACH:
+		opStr = "SQLITE_ATTACH"
+	case sqlite.SQLITE_DETACH:
+		opStr = "SQLITE_DETACH"
+	case sqlite.SQLITE_CREATE_VTABLE:
+		opStr = "SQLITE_CREATE_VTABLE"
+	case sqlite.SQLITE_DROP_VTABLE:
+		opStr = "SQLITE_DROP_VTABLE"
 	default:
 		return sqlite.SQLITE_OK
 	}
+
+	fmt.Fprintf(
+		os.Stderr,
+		"sqlite3tmp: blocked operation nr=%d name=%q\n",
+		op,
+		opStr,
+	)
+
+	return sqlite.SQLITE_DENY
 }
 
 func rawConnSetup(driverConn any) error {
@@ -239,8 +254,7 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, `sqlite3tmp: %v
 
-Usage: sqlite3tmp
-       echo SELECT 1 | sqlite3tmp
+Usage: echo SELECT 1 | sqlite3tmp
 `, err)
 
 		os.Exit(1)

@@ -12,7 +12,7 @@ pkgs.pkgsStatic.buildGoModule {
   '';
 
   meta = {
-    description = "sqlite3tmp - ";
+    description = "sqlite3tmp - run SQL against an in-memory SQLite database";
     homepage = "https://github.com/andrieee44/compilerms";
     license = lib.licenses.agpl3Plus;
     mainProgram = "sqlite3tmp";
