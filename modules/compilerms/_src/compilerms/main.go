@@ -28,6 +28,7 @@ func run() error {
 	mux = http.NewServeMux()
 	mux.Handle("POST /gcc", handlers.NewCompilerHandler(compilers.GCC))
 	mux.Handle("POST /java", handlers.NewCompilerHandler(compilers.Java))
+	mux.Handle("POST /sqlite3tmp", handlers.NewCompilerHandler(compilers.SQLite3tmp))
 
 	srv = &http.Server{
 		Addr:    address,

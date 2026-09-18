@@ -5,20 +5,6 @@ import (
 	"path/filepath"
 )
 
-func mkdirTemp(pattern string) (string, error) {
-	var (
-		tmpdir string
-		err    error
-	)
-
-	tmpdir, err = os.MkdirTemp(os.TempDir(), pattern)
-	if err != nil {
-		return "", err
-	}
-
-	return tmpdir, nil
-}
-
 func mkdirFiles(name string, files map[string]string) error {
 	var (
 		key, val string

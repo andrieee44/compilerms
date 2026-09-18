@@ -143,7 +143,7 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 		return Output{}, fmt.Errorf("%w: %w", ErrBadRequest, err)
 	}
 
-	tmpdir, err = mkdirTemp("compilerms-java-*")
+	tmpdir, err = os.MkdirTemp(os.TempDir(), "compilerms-java-*")
 	if err != nil {
 		return Output{}, err
 	}

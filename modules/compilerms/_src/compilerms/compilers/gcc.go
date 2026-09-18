@@ -111,7 +111,7 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 		return Output{}, fmt.Errorf("%w: %w", ErrBadRequest, err)
 	}
 
-	tmpdir, err = mkdirTemp("compilerms-gcc-*")
+	tmpdir, err = os.MkdirTemp(os.TempDir(), "compilerms-gcc-*")
 	if err != nil {
 		return Output{}, err
 	}
