@@ -51,8 +51,8 @@ func NewCompilerHandler[T any](
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 
 		err = json.NewEncoder(w).Encode(struct {
 			Output string `json:"output"`
