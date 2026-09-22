@@ -221,6 +221,7 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 						-fsanitize=undefined \
 						-fstack-protector-strong \
 						-g \
+						-lm \
 						-I /include \
 						-o /program \
 						%s
