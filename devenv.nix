@@ -61,6 +61,8 @@
       deadnix.enable = true;
       nixfmt.enable = true;
       statix.enable = true;
+
+      # YAML
       yamllint.enable = true;
     };
   };
