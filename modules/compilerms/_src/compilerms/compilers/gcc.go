@@ -210,6 +210,7 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 						-Wformat=2 \
 						-Wlogical-op \
 						-Wmissing-prototypes \
+						-Wno-missing-prototypes \
 						-Wnull-dereference \
 						-Wpedantic \
 						-Wshadow \

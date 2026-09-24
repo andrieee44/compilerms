@@ -1,15 +1,7 @@
 { config, pkgs, ... }:
 {
   git-hooks.hooks = {
-    # Bash
-    shellcheck.enable = true;
-    shfmt.enable = true;
-
-    # Link checker
-    lychee.enable = true;
-
     # Go
-    gofmt.enable = true;
     golangci-lint.enable = true;
 
     # Markdown
@@ -23,14 +15,13 @@
     check-merge-conflicts.enable = true;
     detect-private-keys.enable = true;
     end-of-file-fixer.enable = true;
+    lychee.enable = true;
+    treefmt.enable = true;
     trim-trailing-whitespace.enable = true;
 
     # Nix
-    deadnix.enable = true;
     flake-checker.enable = true;
     nil.enable = true;
-    nixfmt.enable = true;
-    statix.enable = true;
 
     flake-check = {
       enable = true;
@@ -40,7 +31,6 @@
 
     # YAML
     check-yaml.enable = true;
-    yamllint.enable = true;
   };
 
   languages = {
@@ -52,4 +42,26 @@
     git
     nixfmt
   ];
+
+  treefmt = {
+    enable = true;
+
+    config.programs = {
+      # Bash
+      shellcheck.enable = true;
+      shfmt.enable = true;
+
+      # Go
+      gofmt.enable = true;
+
+      # Markdown
+      mdformat.enable = true;
+
+      # Nix
+      deadnix.enable = true;
+      nixfmt.enable = true;
+      statix.enable = true;
+      yamllint.enable = true;
+    };
+  };
 }
