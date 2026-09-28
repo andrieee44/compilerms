@@ -78,10 +78,13 @@ var (
 		"mprotect":        {},
 		"munmap":          {},
 		"newfstatat":      {},
+		"open":            {},
 		"openat":          {},
+		"pipe2":           {},
 		"pread64":         {},
 		"prlimit64":       {},
 		"read":            {},
+		"readlink":        {},
 		"readlinkat":      {},
 		"rseq":            {},
 		"rt_sigaction":    {},
@@ -199,7 +202,7 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 					--seccomp 3 3< %s \
 					-- gcc \
 						-D_FORTIFY_SOURCE=3 \
-						-O1 \
+						-O2 \
 						-Wall \
 						-Wconversion \
 						-Wdouble-promotion \
@@ -210,11 +213,11 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 						-Wformat=2 \
 						-Wlogical-op \
 						-Wmissing-prototypes \
-						-Wno-missing-prototypes \
 						-Wnull-dereference \
 						-Wpedantic \
 						-Wshadow \
 						-Wsign-conversion \
+						-Wstrict-prototypes \
 						-Wundef \
 						-fanalyzer \
 						-fno-omit-frame-pointer \
