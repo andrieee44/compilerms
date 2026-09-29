@@ -132,10 +132,10 @@ var (
 
 func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 	var (
-		tmpdir, source, compilerBPF, programBPF string
-		sources                                 []string
-		output                                  Output
-		err                                     error
+		roDir, runDir, source string
+		sources               []string
+		output                Output
+		err                   error
 	)
 
 	err = validate.Struct(opts)
@@ -143,14 +143,14 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 		return Output{}, fmt.Errorf("%w: %w", ErrBadRequest, err)
 	}
 
-	tmpdir, err = os.MkdirTemp(os.TempDir(), "compilerms-java-*")
+	roDir, err = os.MkdirTemp(os.TempDir(), "compilerms-java-readonly-*")
 	if err != nil {
 		return Output{}, err
 	}
 
-	defer os.RemoveAll(tmpdir) //nolint:errcheck
+	defer os.RemoveAll(roDir) //nolint:errcheck
 
-	err = mkdirFiles(filepath.Join(tmpdir, "sources"), opts.Sources)
+	err = mkdirWithFiles(filepath.Join(roDir, "sources"), opts.Sources)
 	if err != nil {
 		return Output{}, err
 	}
@@ -160,17 +160,28 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 		sources = append(sources, filepath.Join("/", "sources", source))
 	}
 
-	compilerBPF = filepath.Join(tmpdir, "compiler.bpf")
-	err = writeSeccompBPF(compilerBPF, javaCompilerWhitelist)
+	err = writeSeccompBPF(
+		filepath.Join(roDir, "seccomp", "compiler.bpf"),
+		javaCompilerWhitelist,
+	)
 	if err != nil {
 		return Output{}, err
 	}
 
-	programBPF = filepath.Join(tmpdir, "program.bpf")
-	err = writeSeccompBPF(programBPF, javaProgramWhitelist)
+	err = writeSeccompBPF(
+		filepath.Join(roDir, "seccomp", "program.bpf"),
+		javaProgramWhitelist,
+	)
 	if err != nil {
 		return Output{}, err
 	}
+
+	runDir, err = os.MkdirTemp(os.TempDir(), "compilerms-java-runtime-*")
+	if err != nil {
+		return Output{}, err
+	}
+
+	defer os.RemoveAll(runDir) //nolint:errcheck
 
 	output, err = run(
 		ctx,
@@ -200,7 +211,9 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 			ulimit -t 5
 			ulimit -v 1048576
 
-			home="$(dirname "$(dirname "$(readlink -e "$(which java)")")")"
+			JAVA_HOME="$(dirname "$(dirname "$(readlink -e "$(which java)")")")"
+			RODIR=%s
+			RUNDIR=%s
 
 			exec trapseccomp \
 				bwrap \
@@ -211,20 +224,21 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 					--unshare-all \
 					--unshare-user \
 					--hostname compilerms \
-					--bind %s / \
+					--bind "$RUNDIR" / \
 					--dev /dev \
 					--proc /proc \
 					--tmpfs /tmp \
-					--ro-bind "$home/bin/javac" "$home/bin/javac" \
-					--ro-bind "$home/lib" "$home/lib" \
+					--ro-bind "$JAVA_HOME/bin/javac" "$JAVA_HOME/bin/javac" \
+					--ro-bind "$JAVA_HOME/lib" "$JAVA_HOME/lib" \
+					--ro-bind "$RODIR/sources" /sources \
 					--ro-bind /lib /lib \
 					--ro-bind /lib64 /lib64 \
 					--ro-bind /usr/lib /usr/lib \
 					--ro-bind /usr/lib64 /usr/lib64 \
 					--chdir / \
-					--setenv PATH "$home/bin" \
+					--setenv PATH "$JAVA_HOME/bin" \
 					--setenv TMPDIR /tmp \
-					--seccomp 3 3< %s \
+					--seccomp 3 3< "$RODIR/seccomp/compiler.bpf" \
 					-- javac \
 						-J-XX:+UseSerialGC \
 						-J-XX:-UsePerfData \
@@ -247,8 +261,8 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 						-Xlint \
 						-d /out \
 						%s
-		`, shellescape.Quote(tmpdir),
-			shellescape.Quote(compilerBPF),
+		`, shellescape.Quote(roDir),
+			shellescape.Quote(runDir),
 			shellescape.QuoteCommand(sources)),
 	)
 	if err != nil {
@@ -283,7 +297,9 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 			ulimit -t 3
 			ulimit -v 1048576
 
-			home="$(dirname "$(dirname "$(readlink -e "$(which java)")")")"
+			JAVA_HOME="$(dirname "$(dirname "$(readlink -e "$(which java)")")")"
+			RODIR=%s
+			RUNDIR=%s
 
 			exec trapseccomp \
 				bwrap \
@@ -294,20 +310,20 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 					--unshare-all \
 					--unshare-user \
 					--hostname compilerms \
-					--bind %s / \
+					--bind "$RUNDIR" / \
 					--dev /dev \
 					--proc /proc \
 					--tmpfs /tmp \
-					--ro-bind "$home/bin/java" "$home/bin/java" \
-					--ro-bind "$home/lib" "$home/lib" \
+					--ro-bind "$JAVA_HOME/bin/java" "$JAVA_HOME/bin/java" \
+					--ro-bind "$JAVA_HOME/lib" "$JAVA_HOME/lib" \
 					--ro-bind /lib /lib \
 					--ro-bind /lib64 /lib64 \
 					--ro-bind /usr/lib /usr/lib \
 					--ro-bind /usr/lib64 /usr/lib64 \
 					--chdir / \
-					--setenv PATH "$home/bin" \
+					--setenv PATH "$JAVA_HOME/bin" \
 					--setenv TMPDIR /tmp \
-					--seccomp 3 3< %s \
+					--seccomp 3 3< "$RODIR/seccomp/program.bpf" \
 					-- java \
 						-XX:+UseSerialGC \
 						-XX:-UsePerfData \
@@ -328,7 +344,7 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 						-Xss256k \
 						-cp /out \
 						Main
-		`, shellescape.Quote(tmpdir), shellescape.Quote(programBPF)),
+		`, shellescape.Quote(roDir), shellescape.Quote(runDir)),
 	)
 	if err != nil {
 		return output, fmt.Errorf("%w: %w", ErrProgram, err)

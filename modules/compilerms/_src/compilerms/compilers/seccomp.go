@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/elastic/go-seccomp-bpf"
@@ -27,6 +28,11 @@ func writeSeccompBPF(name string, whitelist map[string]struct{}) error {
 			Names:  slices.Collect(maps.Keys(whitelist)),
 		}},
 	}).Assemble()
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(filepath.Dir(name), 0700)
 	if err != nil {
 		return err
 	}

@@ -103,10 +103,10 @@ var (
 
 func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 	var (
-		tmpdir, source, compilerBPF, programBPF string
-		sources                                 []string
-		output                                  Output
-		err                                     error
+		roDir, runDir, source string
+		sources               []string
+		output                Output
+		err                   error
 	)
 
 	err = validate.Struct(opts)
@@ -114,19 +114,19 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 		return Output{}, fmt.Errorf("%w: %w", ErrBadRequest, err)
 	}
 
-	tmpdir, err = os.MkdirTemp(os.TempDir(), "compilerms-gcc-*")
+	roDir, err = os.MkdirTemp(os.TempDir(), "compilerms-gcc-readonly-*")
 	if err != nil {
 		return Output{}, err
 	}
 
-	defer os.RemoveAll(tmpdir) //nolint:errcheck
+	defer os.RemoveAll(roDir) //nolint:errcheck
 
-	err = mkdirFiles(filepath.Join(tmpdir, "include"), opts.Headers)
+	err = mkdirWithFiles(filepath.Join(roDir, "include"), opts.Headers)
 	if err != nil {
 		return Output{}, err
 	}
 
-	err = mkdirFiles(filepath.Join(tmpdir, "sources"), opts.Sources)
+	err = mkdirWithFiles(filepath.Join(roDir, "sources"), opts.Sources)
 	if err != nil {
 		return Output{}, err
 	}
@@ -136,17 +136,28 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 		sources = append(sources, filepath.Join("/", "sources", source))
 	}
 
-	compilerBPF = filepath.Join(tmpdir, "compiler.bpf")
-	err = writeSeccompBPF(compilerBPF, gccCompilerWhitelist)
+	err = writeSeccompBPF(
+		filepath.Join(roDir, "seccomp", "compiler.bpf"),
+		gccCompilerWhitelist,
+	)
 	if err != nil {
 		return Output{}, err
 	}
 
-	programBPF = filepath.Join(tmpdir, "program.bpf")
-	err = writeSeccompBPF(programBPF, gccProgramWhitelist)
+	err = writeSeccompBPF(
+		filepath.Join(roDir, "seccomp", "program.bpf"),
+		gccProgramWhitelist,
+	)
 	if err != nil {
 		return Output{}, err
 	}
+
+	runDir, err = os.MkdirTemp(os.TempDir(), "compilerms-gcc-runtime-*")
+	if err != nil {
+		return Output{}, err
+	}
+
+	defer os.RemoveAll(runDir) //nolint:errcheck
 
 	output, err = run(
 		ctx,
@@ -176,6 +187,9 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 			ulimit -t 5
 			ulimit -v 1048576
 
+			RODIR=%s
+			RUNDIR=%s
+
 			exec trapseccomp \
 				bwrap \
 					--clearenv \
@@ -185,9 +199,11 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 					--unshare-all \
 					--unshare-user \
 					--hostname compilerms \
-					--bind %s / \
+					--bind "$RUNDIR" / \
 					--dev /dev \
 					--tmpfs /tmp \
+					--ro-bind "$RODIR/include" /include \
+					--ro-bind "$RODIR/sources" /sources \
 					--ro-bind /lib /lib \
 					--ro-bind /lib64 /lib64 \
 					--ro-bind /usr/bin/as /usr/bin/as \
@@ -199,7 +215,7 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 					--chdir / \
 					--setenv PATH /usr/bin \
 					--setenv TMPDIR /tmp \
-					--seccomp 3 3< %s \
+					--seccomp 3 3< "$RODIR/seccomp/compiler.bpf" \
 					-- gcc \
 						-D_FORTIFY_SOURCE=3 \
 						-O2 \
@@ -229,8 +245,8 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 						-I /include \
 						-o /program \
 						%s
-		`, shellescape.Quote(tmpdir),
-			shellescape.Quote(compilerBPF),
+		`, shellescape.Quote(roDir),
+			shellescape.Quote(runDir),
 			shellescape.QuoteCommand(sources)),
 	)
 	if err != nil {
@@ -265,6 +281,9 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 			ulimit -t 3
 			ulimit -v 1048576
 
+			RODIR=%s
+			RUNDIR=%s
+
 			exec trapseccomp \
 				bwrap \
 					--clearenv \
@@ -274,7 +293,7 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 					--unshare-all \
 					--unshare-user \
 					--hostname compilerms \
-					--bind %s / \
+					--bind "$RUNDIR" / \
 					--dev /dev \
 					--proc /proc \
 					--tmpfs /tmp \
@@ -284,9 +303,9 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 					--ro-bind /usr/lib64 /usr/lib64 \
 					--chdir / \
 					--setenv TMPDIR /tmp \
-					--seccomp 3 3< %s \
+					--seccomp 3 3< "$RODIR/seccomp/program.bpf" \
 					-- /program
-		`, shellescape.Quote(tmpdir), shellescape.Quote(programBPF)),
+		`, shellescape.Quote(roDir), shellescape.Quote(runDir)),
 	)
 	if err != nil {
 		return output, fmt.Errorf("%w: %w", ErrProgram, err)

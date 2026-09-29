@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 )
 
-func mkdirFiles(name string, files map[string]string) error {
+func mkdirWithFiles(name string, files map[string]string) error {
 	var (
 		key, val string
 		err      error
 	)
 
-	err = os.Mkdir(name, 0700)
+	err = os.MkdirAll(name, 0700)
 	if err != nil {
 		return err
 	}

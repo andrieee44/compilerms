@@ -55,9 +55,9 @@ var sqlite3tmpProgramWhitelist map[string]struct{} = map[string]struct{}{
 
 func SQLite3tmp(ctx context.Context, opts SQLite3tmpOpts) (Output, error) {
 	var (
-		tmpdir, programBPF string
-		output             Output
-		err                error
+		roDir, runDir string
+		output        Output
+		err           error
 	)
 
 	err = validate.Struct(opts)
@@ -65,18 +65,27 @@ func SQLite3tmp(ctx context.Context, opts SQLite3tmpOpts) (Output, error) {
 		return Output{}, fmt.Errorf("%w: %w", ErrBadRequest, err)
 	}
 
-	tmpdir, err = os.MkdirTemp(os.TempDir(), "compilerms-sqlite3tmp-*")
+	roDir, err = os.MkdirTemp(os.TempDir(), "compilerms-sqlite3tmp-readonly-*")
 	if err != nil {
 		return Output{}, err
 	}
 
-	defer os.RemoveAll(tmpdir) //nolint:errcheck
+	defer os.RemoveAll(roDir) //nolint:errcheck
 
-	programBPF = filepath.Join(tmpdir, "program.bpf")
-	err = writeSeccompBPF(programBPF, sqlite3tmpProgramWhitelist)
+	err = writeSeccompBPF(
+		filepath.Join(roDir, "seccomp", "program.bpf"),
+		sqlite3tmpProgramWhitelist,
+	)
 	if err != nil {
 		return Output{}, err
 	}
+
+	runDir, err = os.MkdirTemp(os.TempDir(), "compilerms-sqlite3tmp-runtime-*")
+	if err != nil {
+		return Output{}, err
+	}
+
+	defer os.RemoveAll(runDir) //nolint:errcheck
 
 	output, err = run(
 		ctx,
@@ -106,6 +115,9 @@ func SQLite3tmp(ctx context.Context, opts SQLite3tmpOpts) (Output, error) {
 			ulimit -t 5
 			ulimit -v 1048576
 
+			RODIR=%s
+			RUNDIR=%s
+
 			exec trapseccomp \
 				bwrap \
 					--clearenv \
@@ -115,15 +127,15 @@ func SQLite3tmp(ctx context.Context, opts SQLite3tmpOpts) (Output, error) {
 					--unshare-all \
 					--unshare-user \
 					--hostname compilerms \
-					--bind %s / \
+					--bind "$RUNDIR" / \
 					--dev /dev \
 					--tmpfs /tmp \
 					--ro-bind "$(which sqlite3tmp)" /sqlite3tmp \
 					--chdir / \
 					--setenv TMPDIR /tmp \
-					--seccomp 3 3< %s \
+					--seccomp 3 3< "$RODIR/seccomp/program.bpf" \
 					-- /sqlite3tmp
-		`, shellescape.Quote(tmpdir), shellescape.Quote(programBPF)),
+		`, shellescape.Quote(roDir), shellescape.Quote(runDir)),
 	)
 	if err != nil {
 		return output, fmt.Errorf("%w: %w", ErrProgram, err)
