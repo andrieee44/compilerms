@@ -212,6 +212,7 @@ func GCC(ctx context.Context, opts GCCOpts) (Output, error) {
 					--ro-bind /usr/include /usr/include \
 					--ro-bind /usr/lib /usr/lib \
 					--ro-bind /usr/lib64 /usr/lib64 \
+					--ro-bind /usr/libexec/gcc /usr/libexec/gcc \
 					--chdir / \
 					--setenv PATH /usr/bin \
 					--setenv TMPDIR /tmp \

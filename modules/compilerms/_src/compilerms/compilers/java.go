@@ -21,12 +21,13 @@ var (
 		"arch_prctl":        {},
 		"brk":               {},
 		"clock_getres":      {},
-		"clock_gettime":     {},
 		"clock_nanosleep":   {},
 		"clone3":            {},
 		"close":             {},
 		"connect":           {},
+		"copy_file_range":   {},
 		"dup":               {},
+		"dup2":              {},
 		"execve":            {},
 		"exit":              {},
 		"exit_group":        {},
@@ -35,9 +36,15 @@ var (
 		"futex":             {},
 		"getcwd":            {},
 		"getdents64":        {},
+		"getegid":           {},
 		"geteuid":           {},
+		"getgid":            {},
+		"getpgrp":           {},
 		"getpid":            {},
+		"getppid":           {},
 		"getrandom":         {},
+		"getresgid":         {},
+		"getresuid":         {},
 		"gettid":            {},
 		"getuid":            {},
 		"ioctl":             {},
@@ -54,7 +61,6 @@ var (
 		"prlimit64":         {},
 		"read":              {},
 		"readlink":          {},
-		"readlinkat":        {},
 		"restart_syscall":   {},
 		"rseq":              {},
 		"rt_sigaction":      {},
@@ -62,6 +68,7 @@ var (
 		"rt_sigreturn":      {},
 		"sched_getaffinity": {},
 		"sched_yield":       {},
+		"sendto":            {},
 		"set_robust_list":   {},
 		"set_tid_address":   {},
 		"setsockopt":        {},
@@ -70,6 +77,7 @@ var (
 		"statfs":            {},
 		"statx":             {},
 		"sysinfo":           {},
+		"tgkill":            {},
 		"uname":             {},
 		"wait4":             {},
 		"write":             {},
@@ -85,6 +93,7 @@ var (
 		"clone3":            {},
 		"close":             {},
 		"connect":           {},
+		"dup2":              {},
 		"execve":            {},
 		"exit":              {},
 		"exit_group":        {},
@@ -92,8 +101,16 @@ var (
 		"fstat":             {},
 		"futex":             {},
 		"getcwd":            {},
+		"getdents64":        {},
+		"getegid":           {},
+		"geteuid":           {},
+		"getgid":            {},
+		"getpgrp":           {},
 		"getpid":            {},
+		"getppid":           {},
 		"getrandom":         {},
+		"getresgid":         {},
+		"getresuid":         {},
 		"gettid":            {},
 		"getuid":            {},
 		"ioctl":             {},
@@ -109,7 +126,6 @@ var (
 		"prlimit64":         {},
 		"read":              {},
 		"readlink":          {},
-		"readlinkat":        {},
 		"restart_syscall":   {},
 		"rseq":              {},
 		"rt_sigaction":      {},
@@ -117,16 +133,18 @@ var (
 		"rt_sigreturn":      {},
 		"sched_getaffinity": {},
 		"sched_yield":       {},
+		"sendto":            {},
 		"set_robust_list":   {},
 		"set_tid_address":   {},
 		"socket":            {},
 		"stat":              {},
 		"statfs":            {},
-		"statx":             {},
 		"sysinfo":           {},
+		"tgkill":            {},
 		"uname":             {},
 		"wait4":             {},
 		"write":             {},
+		"writev":            {},
 	}
 )
 
@@ -196,7 +214,7 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 		"-p", "MemoryMax=1024M",
 		"-p", "RuntimeMaxSec=5",
 		"-p", "TasksMax=32",
-		"--", "sh", "-c",
+		"--", "/bin/sh", "-c",
 		fmt.Sprintf(`
 			set -eu
 
@@ -211,7 +229,6 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 			ulimit -t 5
 			ulimit -v 1048576
 
-			JAVA_HOME="$(dirname "$(dirname "$(readlink -e "$(which java)")")")"
 			RODIR=%s
 			RUNDIR=%s
 
@@ -224,22 +241,16 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 					--unshare-all \
 					--unshare-user \
 					--hostname compilerms \
-					--bind "$RUNDIR" / \
+					--ro-bind "$RODIR/sources" /app/sources \
+					--bind "$RUNDIR" /app/runtime \
 					--dev /dev \
 					--proc /proc \
 					--tmpfs /tmp \
-					--ro-bind "$JAVA_HOME/bin/javac" "$JAVA_HOME/bin/javac" \
-					--ro-bind "$JAVA_HOME/lib" "$JAVA_HOME/lib" \
-					--ro-bind "$RODIR/sources" /sources \
-					--ro-bind /lib /lib \
-					--ro-bind /lib64 /lib64 \
-					--ro-bind /usr/lib /usr/lib \
-					--ro-bind /usr/lib64 /usr/lib64 \
+					--ro-bind "{{ JAVA_RUNTIME }}" / \
 					--chdir / \
-					--setenv PATH "$JAVA_HOME/bin" \
 					--setenv TMPDIR /tmp \
 					--seccomp 3 3< "$RODIR/seccomp/compiler.bpf" \
-					-- javac \
+					-- /bin/javac \
 						-J-XX:+UseSerialGC \
 						-J-XX:-UsePerfData \
 						-J-XX:ActiveProcessorCount=1 \
@@ -259,7 +270,7 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 						-J-Xss256k \
 						-Werror \
 						-Xlint \
-						-d /out \
+						-d /app/runtime \
 						%s
 		`, shellescape.Quote(roDir),
 			shellescape.Quote(runDir),
@@ -297,7 +308,6 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 			ulimit -t 3
 			ulimit -v 1048576
 
-			JAVA_HOME="$(dirname "$(dirname "$(readlink -e "$(which java)")")")"
 			RODIR=%s
 			RUNDIR=%s
 
@@ -314,17 +324,11 @@ func Java(ctx context.Context, opts JavaOpts) (Output, error) {
 					--dev /dev \
 					--proc /proc \
 					--tmpfs /tmp \
-					--ro-bind "$JAVA_HOME/bin/java" "$JAVA_HOME/bin/java" \
-					--ro-bind "$JAVA_HOME/lib" "$JAVA_HOME/lib" \
-					--ro-bind /lib /lib \
-					--ro-bind /lib64 /lib64 \
-					--ro-bind /usr/lib /usr/lib \
-					--ro-bind /usr/lib64 /usr/lib64 \
+					--ro-bind /nix/store /nix/store \
 					--chdir / \
-					--setenv PATH "$JAVA_HOME/bin" \
 					--setenv TMPDIR /tmp \
 					--seccomp 3 3< "$RODIR/seccomp/program.bpf" \
-					-- java \
+					-- "$(which java)" \
 						-XX:+UseSerialGC \
 						-XX:-UsePerfData \
 						-XX:ActiveProcessorCount=1 \

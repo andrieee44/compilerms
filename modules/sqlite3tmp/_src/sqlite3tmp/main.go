@@ -147,18 +147,23 @@ func executeStatements(conn *sql.Conn, statements []string) ([]Output, error) {
 		output           Output
 		rows             *sql.Rows
 		rowPtrs, rowVals []any
-		i                int
+		n, i             int
 		err              error
 	)
 
 	outputs = make([]Output, 0, len(statements))
 
-	for _, statement = range statements {
+	for n, statement = range statements {
 		output = Output{}
 
 		rows, err = conn.QueryContext(context.Background(), statement)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf(
+				"statement %d\n%q\n%v",
+				n+1,
+				strings.TrimSpace(statement),
+				err,
+			)
 		}
 
 		output.Columns, err = rows.Columns()

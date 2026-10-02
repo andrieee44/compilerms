@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/andrieee44/compilerms/modules/compilerms/_src/compilerms/compilers"
 	"github.com/andrieee44/compilerms/modules/compilerms/_src/compilerms/handlers"
@@ -31,14 +32,17 @@ func run() error {
 	mux.Handle("POST /sqlite3tmp", handlers.NewCompilerHandler(compilers.SQLite3tmp))
 
 	srv = &http.Server{
-		Addr:    address,
-		Handler: handlers.CORS(handlers.RateLimiter(mux)),
+		Addr:              address,
+		Handler:           handlers.CORS(handlers.RateLimiter(mux)),
+		ReadHeaderTimeout: 3 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      35 * time.Second,
+		IdleTimeout:       30 * time.Second,
+		MaxHeaderBytes:    8 << 10,
 	}
 
 	srv.Protocols = new(http.Protocols)
 	srv.Protocols.SetHTTP1(true)
-	srv.Protocols.SetHTTP2(true)
-	srv.Protocols.SetUnencryptedHTTP2(true)
 
 	slog.Info("Compiler Microservice Starting", "address", address)
 

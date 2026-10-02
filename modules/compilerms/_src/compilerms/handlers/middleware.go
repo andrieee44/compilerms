@@ -9,9 +9,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-var sem *semaphore.Weighted = semaphore.NewWeighted(
-	max(1, int64(runtime.NumCPU())/3),
-)
+var sem *semaphore.Weighted = semaphore.NewWeighted(int64(runtime.NumCPU()))
 
 func RateLimiter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/nanmu42/limitio"
 	"golang.org/x/sys/unix"
@@ -33,6 +34,11 @@ func run(
 	cmd.Stdin = stdin
 	cmd.Stdout = limitWriter
 	cmd.Stderr = limitWriter
+	cmd.WaitDelay = 2 * time.Second
+
+	cmd.Cancel = func() error {
+		return unix.Kill(-cmd.Process.Pid, unix.SIGKILL)
+	}
 
 	cmd.SysProcAttr = &unix.SysProcAttr{
 		Pdeathsig: unix.SIGKILL,
