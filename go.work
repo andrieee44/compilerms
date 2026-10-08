@@ -1,7 +1,7 @@
-go 1.26.5
+go 1.26.7
 
 use (
 	./modules/compilerms/_src/compilerms
+	./modules/shlite/_src/shlite
 	./modules/sqlite3tmp/_src/sqlite3tmp
-	./modules/trapseccomp/_src/trapseccomp
 )

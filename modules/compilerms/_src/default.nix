@@ -3,7 +3,7 @@ pkgs.pkgsStatic.buildGoModule {
   doCheck = true;
   name = "compilerms";
   src = ./compilerms;
-  vendorHash = "sha256-fbVAYvmepzYFVhzRW3E70sb91+Y/+MzaS6nNV+QiERk=";
+  vendorHash = "sha256-oAaNJjegZayVuNGy29BXX43gqrEkYU1AVT2LOrC6JpM=";
 
   checkPhase = ''
     runHook preCheck

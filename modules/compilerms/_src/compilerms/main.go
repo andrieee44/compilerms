@@ -1,57 +1,81 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
-	"time"
 
-	"github.com/andrieee44/compilerms/modules/compilerms/_src/compilerms/compilers"
-	"github.com/andrieee44/compilerms/modules/compilerms/_src/compilerms/handlers"
+	"github.com/lmittmann/tint"
 )
+
+func CORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
 
 func run() error {
 	var (
-		address string
-		mux     *http.ServeMux
-		srv     *http.Server
-		err     error
+		cfg  *Config
+		mux  *http.ServeMux
+		name string
+		lang *Language
+		srv  *http.Server
+		err  error
 	)
 
-	if len(os.Args) < 2 {
-		return errors.New("missing argument <ADDRESS>")
+	slog.SetDefault(slog.New(tint.NewTextHandler(os.Stderr, nil)))
+
+	cfg, err = LoadConfig()
+	if err != nil {
+		return err
 	}
 
-	address = os.Args[1]
-
 	mux = http.NewServeMux()
-	mux.Handle("POST /gcc", handlers.NewCompilerHandler(compilers.GCC))
-	mux.Handle("POST /java", handlers.NewCompilerHandler(compilers.Java))
-	mux.Handle("POST /sqlite3tmp", handlers.NewCompilerHandler(compilers.SQLite3tmp))
+
+	for name = range cfg.Languages {
+		if !cfg.Languages[name].Enable {
+			continue
+		}
+
+		lang = NewLanguage(name, cfg)
+
+		err = lang.RunTests()
+		if err != nil {
+			return err
+		}
+
+		mux.HandleFunc(fmt.Sprintf("POST /%s", name), lang.Handler)
+		mux.HandleFunc(fmt.Sprintf("GET /%s", name), lang.HandlerWS)
+	}
 
 	srv = &http.Server{
-		Addr:              address,
-		Handler:           handlers.CORS(handlers.RateLimiter(mux)),
-		ReadHeaderTimeout: 3 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      35 * time.Second,
-		IdleTimeout:       30 * time.Second,
-		MaxHeaderBytes:    8 << 10,
+		Addr:              cfg.Global.HTTPServer.Address,
+		Handler:           CORS(mux),
+		IdleTimeout:       cfg.Global.HTTPServer.IdleTimeout,
+		MaxHeaderBytes:    cfg.Global.HTTPServer.MaxHeaderBytes,
+		ReadHeaderTimeout: cfg.Global.HTTPServer.ReadHeaderTimeout,
+		ReadTimeout:       cfg.Global.HTTPServer.ReadTimeout,
+		WriteTimeout:      cfg.Global.HTTPServer.WriteTimeout,
 	}
 
 	srv.Protocols = new(http.Protocols)
 	srv.Protocols.SetHTTP1(true)
 
-	slog.Info("Compiler Microservice Starting", "address", address)
+	slog.Info("Compiler Microservice Starting", "address", srv.Addr)
 
-	err = srv.ListenAndServe()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return srv.ListenAndServe()
 }
 
 func main() {
@@ -61,8 +85,7 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, `compilerms: %v
 
-Usage:   compilerms <ADDRESS>
-Example: compilerms localhost:8080
+Usage: COMPILERMS_CONFIG_PATH="/path/to/config.yaml" compilerms
 `, err)
 
 		os.Exit(1)

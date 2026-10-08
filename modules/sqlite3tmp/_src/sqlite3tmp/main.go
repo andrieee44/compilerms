@@ -2,23 +2,16 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"os"
-	"strings"
 
 	sqlite "gosqlite.org"
 	sqlite3 "modernc.org/sqlite/lib"
 )
-
-type Output struct {
-	Columns []string `json:"columns,omitempty"`
-	Rows    [][]any  `json:"rows,omitempty"`
-}
 
 var (
 	pragmas sqlite.Pragmas = sqlite.Pragmas{
@@ -69,9 +62,9 @@ func authorizer(op int, _, _, _, _ string) int {
 
 	fmt.Fprintf(
 		os.Stderr,
-		"sqlite3tmp: blocked operation nr=%d name=%q\n",
-		op,
+		"sqlite3tmp: blocked operation name=%q nr=%d\n",
 		opStr,
+		op,
 	)
 
 	return sqlite.SQLITE_DENY
@@ -103,112 +96,125 @@ func rawConnSetup(driverConn any) error {
 	return nil
 }
 
-func readStatements(rd io.Reader) ([]string, error) {
+func evaluate(conn *sql.Conn, statement string) error {
 	var (
-		reader     *bufio.Reader
-		builder    strings.Builder
-		statements []string
-		statement  string
-		err        error
-	)
-
-	reader = bufio.NewReader(rd)
-
-	for {
-		for {
-			statement, err = reader.ReadString(';')
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					builder.WriteString(statement)
-					builder.WriteByte(';')
-
-					return append(statements, builder.String()), nil
-				}
-
-				return nil, err
-			}
-
-			builder.WriteString(statement)
-
-			if sqlite.Complete(builder.String()) {
-				break
-			}
-		}
-
-		statements = append(statements, builder.String())
-		builder.Reset()
-	}
-}
-
-func executeStatements(conn *sql.Conn, statements []string) ([]Output, error) {
-	var (
-		outputs          []Output
-		statement        string
-		output           Output
 		rows             *sql.Rows
+		cols             []string
 		rowPtrs, rowVals []any
-		n, i             int
+		table            [][]any
+		i                int
 		err              error
 	)
 
-	outputs = make([]Output, 0, len(statements))
-
-	for n, statement = range statements {
-		output = Output{}
-
-		rows, err = conn.QueryContext(context.Background(), statement)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"statement %d\n%q\n%v",
-				n+1,
-				strings.TrimSpace(statement),
-				err,
-			)
-		}
-
-		output.Columns, err = rows.Columns()
-		if err != nil {
-			return nil, err
-		}
-
-		if len(output.Columns) == 0 {
-			continue
-		}
-
-		for rows.Next() {
-			rowPtrs = make([]any, len(output.Columns))
-			rowVals = make([]any, len(output.Columns))
-
-			for i = range len(output.Columns) {
-				rowPtrs[i] = &rowVals[i]
-			}
-
-			err = rows.Scan(rowPtrs...)
-			if err != nil {
-				return nil, err
-			}
-
-			output.Rows = append(output.Rows, rowVals)
-		}
-
-		err = rows.Err()
-		if err != nil {
-			return nil, err
-		}
-
-		outputs = append(outputs, output)
+	rows, err = conn.QueryContext(context.Background(), statement)
+	if err != nil {
+		return err
 	}
 
-	return outputs, nil
+	cols, err = rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	if len(cols) == 0 {
+		return nil
+	}
+
+	for rows.Next() {
+		rowPtrs = make([]any, len(cols))
+		rowVals = make([]any, len(cols))
+
+		for i = range len(cols) {
+			rowPtrs[i] = &rowVals[i]
+		}
+
+		err = rows.Scan(rowPtrs...)
+		if err != nil {
+			return err
+		}
+
+		table = append(table, rowVals)
+	}
+
+	return json.NewEncoder(os.Stdout).Encode(
+		struct {
+			Cols  []string `json:"cols"`
+			Table [][]any  `json:"table"`
+		}{
+			Cols:  cols,
+			Table: table,
+		},
+	)
+}
+
+func read(input []byte) ([]string, []byte) {
+	var (
+		buf, statement []byte
+		statements     []string
+	)
+
+	for buf = range bytes.SplitAfterSeq(input, []byte{';'}) {
+		statement = append(statement, buf...)
+
+		if sqlite.Complete(string(statement)) {
+			statements = append(statements, string(statement))
+			statement = []byte{}
+		}
+	}
+
+	return statements, statement
+}
+
+func repl(conn *sql.Conn) error {
+	var (
+		scanner       *bufio.Scanner
+		line          int
+		input         []byte
+		statements    []string
+		statement     string
+		firstErr, err error
+	)
+
+	scanner = bufio.NewScanner(os.Stdin)
+	line = 0
+
+	for scanner.Scan() {
+		line++
+		input = append(input, scanner.Bytes()...)
+
+		statements, input = read(input)
+		for _, statement = range statements {
+			err = evaluate(conn, statement)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				err = fmt.Errorf("line %d: %v", line, err)
+
+				if firstErr == nil {
+					firstErr = err
+				}
+			}
+		}
+	}
+
+	if len(input) != 0 {
+		err = evaluate(conn, string(input))
+		if err != nil {
+			return fmt.Errorf("line %d: %v", line, err)
+		}
+	}
+
+	if firstErr != nil {
+		return firstErr
+	}
+
+	return scanner.Err()
 }
 
 func run() error {
 	var (
-		db         *sqlite.DB
-		conn       *sql.Conn
-		statements []string
-		outputs    []Output
-		err        error
+		db   *sqlite.DB
+		conn *sql.Conn
+		err  error
 	)
 
 	db, err = sqlite.Open(sqlite.Config{
@@ -233,17 +239,7 @@ func run() error {
 		return err
 	}
 
-	statements, err = readStatements(os.Stdin)
-	if err != nil {
-		return err
-	}
-
-	outputs, err = executeStatements(conn, statements)
-	if err != nil {
-		return err
-	}
-
-	return json.NewEncoder(os.Stdout).Encode(outputs)
+	return repl(conn)
 }
 
 func main() {
