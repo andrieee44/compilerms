@@ -1,18 +1,11 @@
 { lib, pkgs }:
 pkgs.pkgsStatic.buildGoModule {
-  doCheck = true;
   name = "shlite";
-  src = ./shlite;
-  vendorHash = null;
-
-  checkPhase = ''
-    runHook preCheck
-    go vet ./...
-    runHook postCheck
-  '';
+  src = ./.;
+  vendorHash = "sha256-3/tNPMYKxKjwprceoPRjRJuTNBwJSJE4LD8grnh+haI=";
 
   meta = {
-    description = "shlite - ";
+    description = "shlite - shell-free wrapper with globbing and env filtering";
     homepage = "https://github.com/andrieee44/compilerms";
     license = lib.licenses.agpl3Plus;
     mainProgram = "shlite";

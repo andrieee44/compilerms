@@ -1,7 +1,6 @@
-go 1.26.7
+go 1.26.10
 
 use (
-	./modules/compilerms/_src/compilerms
-	./modules/shlite/_src/shlite
-	./modules/sqlite3tmp/_src/sqlite3tmp
+	./modules/compilerms/_src
+	./modules/shlite/_src
 )

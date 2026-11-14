@@ -1,15 +1,8 @@
 { lib, pkgs }:
 pkgs.pkgsStatic.buildGoModule {
-  doCheck = true;
   name = "compilerms";
-  src = ./compilerms;
-  vendorHash = "sha256-oAaNJjegZayVuNGy29BXX43gqrEkYU1AVT2LOrC6JpM=";
-
-  checkPhase = ''
-    runHook preCheck
-    go vet ./...
-    runHook postCheck
-  '';
+  src = ./.;
+  vendorHash = "sha256-niL4i8kwPkMZUxKu0/Vl6GVYBChrdagPvSSVVa84Ukg=";
 
   meta = {
     description = "compilerms - Compiler Microservice";
