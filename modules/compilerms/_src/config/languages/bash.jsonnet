@@ -1,10 +1,10 @@
 local compilerms = import '../compilerms.libsonnet';
 
 {
-  allowedFiles: [],
+  allowedFiles: ['main.sh'],
 
   versions: {
-    as: {
+    bash: {
       name: '/usr/bin/bash',
       args: ['--version'],
     },
@@ -23,9 +23,27 @@ local compilerms = import '../compilerms.libsonnet';
         output: 'Hello World!\n',
         files: {},
       },
+
+      main: {
+        input: 'source /rodir/main.sh\nexit\n',
+        output: 'Hello World!\n',
+        files: { 'main.sh': 'echo "Hello World!"' },
+      },
     },
 
-    batch: self.live,
+    batch: {
+      nothing: {
+        input: '',
+        output: '',
+        files: { 'main.sh': '' },
+      },
+
+      hello: {
+        input: '',
+        output: 'Hello World!\n',
+        files: { 'main.sh': 'echo "Hello World!"' },
+      },
+    },
   },
 
   compiler: null,
@@ -36,7 +54,7 @@ local compilerms = import '../compilerms.libsonnet';
       shliteEnvs: [],
       maxBytesInput: 8 << 10,
       maxBytesOutput: 16 << 10,
-      args: ['/usr/bin/bash'],
+      args: ['/usr/bin/bash', '/rodir/main.sh'],
 
       systemdRunFlags: std.flattenArrays([
         ['--property', 'BindPaths={{ COMPILERMS_RUNDIR }}:/rundir'],
@@ -45,6 +63,7 @@ local compilerms = import '../compilerms.libsonnet';
         ['--property', 'BindReadOnlyPaths=/usr/bin/bash'],
         ['--property', 'BindReadOnlyPaths=/usr/lib'],
         ['--property', 'BindReadOnlyPaths=/usr/lib64'],
+        ['--property', 'BindReadOnlyPaths={{ COMPILERMS_RODIR }}:/rodir'],
         ['--property', 'WorkingDirectory=/rundir'],
         ['--property', |||
           SystemCallFilter=
@@ -99,6 +118,7 @@ local compilerms = import '../compilerms.libsonnet';
     batch: compilerms.MkProgram(cfgProgram),
 
     live: compilerms.MkProgram(cfgProgram {
+      args: ['/usr/bin/bash'],
       systemdRunFlags+: ['--property', 'RuntimeMaxSec=180'],
     }),
   },

@@ -197,7 +197,7 @@ local compilerms = import '../compilerms.libsonnet';
     local cfgProgram = {
       displayName: '/rundir/program',
       shliteEnvs: [],
-      maxBytesInput: 4 << 10,
+      maxBytesInput: 8 << 10,
       maxBytesOutput: 8 << 10,
       args: ['/rundir/program'],
 
