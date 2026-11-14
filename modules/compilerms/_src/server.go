@@ -24,12 +24,12 @@ func newServer(cfg *config) *http.Server {
 	srv = http.Server{
 		Addr:              cfg.HTTP.Address,
 		Handler:           newCORSMiddleware(cfg.HTTP)(mux),
-		IdleTimeout:       cfg.HTTP.IdleTimeout,
+		IdleTimeout:       cfg.HTTP.IdleTimeout.Duration,
 		MaxHeaderBytes:    cfg.HTTP.MaxHeaderBytes,
 		Protocols:         new(http.Protocols),
-		ReadHeaderTimeout: cfg.HTTP.ReadHeaderTimeout,
-		ReadTimeout:       cfg.HTTP.ReadTimeout,
-		WriteTimeout:      cfg.HTTP.WriteTimeout,
+		ReadHeaderTimeout: cfg.HTTP.ReadHeaderTimeout.Duration,
+		ReadTimeout:       cfg.HTTP.ReadTimeout.Duration,
+		WriteTimeout:      cfg.HTTP.WriteTimeout.Duration,
 	}
 
 	srv.Protocols.SetHTTP1(true)

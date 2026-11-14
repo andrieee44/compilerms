@@ -79,9 +79,7 @@ local strace = {
 
 local shlite = {
   name: '/home/andrieee44/.local/bin/shlite',
-
-  systemdRunFlags:
-    ['--property', 'BindReadOnlyPaths=' + self.name],
+  systemdRunFlags: ['--property', 'BindReadOnlyPaths=' + self.name],
 };
 
 {

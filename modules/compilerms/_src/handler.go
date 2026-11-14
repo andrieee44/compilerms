@@ -32,7 +32,11 @@ func newLiveHandler(wsCfg *websocketConfig, langCfg *langConfig) http.Handler {
 
 		conn.SetReadLimit(wsCfg.ReadLimit)
 
-		ctx, cancel = context.WithTimeout(context.Background(), wsCfg.Timeout)
+		ctx, cancel = context.WithTimeout(
+			context.Background(),
+			wsCfg.Timeout.Duration,
+		)
+
 		defer cancel()
 
 		err = wsjson.Read(ctx, conn, &req)

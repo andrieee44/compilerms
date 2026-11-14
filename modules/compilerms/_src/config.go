@@ -8,6 +8,22 @@ import (
 	"github.com/google/go-jsonnet"
 )
 
+type duration struct {
+	time.Duration
+}
+
+func (d duration) MarshalText() ([]byte, error) {
+	return []byte(d.String()), nil
+}
+
+func (d *duration) UnmarshalText(b []byte) error {
+	var err error
+
+	d.Duration, err = time.ParseDuration(string(b))
+
+	return err
+}
+
 type testConfig struct {
 	Input  string            `json:"input"`
 	Output string            `json:"output"`
@@ -48,20 +64,20 @@ type langConfig struct {
 }
 
 type httpConfig struct {
-	Address           string        `json:"address"                        validate:"hostname_port"`
-	MaxBytesReader    int64         `json:"maxBytesReader"                 validate:"required"`
-	MaxHeaderBytes    int           `json:"maxHeaderBytes"                 validate:"required"`
-	IdleTimeout       time.Duration `json:"idleTimeout,format:units"       validate:"required"`
-	ReadHeaderTimeout time.Duration `json:"readHeaderTimeout,format:units" validate:"required"`
-	ReadTimeout       time.Duration `json:"readTimeout,format:units"       validate:"required"`
-	WriteTimeout      time.Duration `json:"writeTimeout,format:units"      validate:"required"`
-	AllowedOrigins    []string      `json:"allowedOrigins"                 validate:"required,min=1"`
+	Address           string   `json:"address"           validate:"hostname_port"`
+	MaxBytesReader    int64    `json:"maxBytesReader"    validate:"required"`
+	MaxHeaderBytes    int      `json:"maxHeaderBytes"    validate:"required"`
+	IdleTimeout       duration `json:"idleTimeout"       validate:"required"`
+	ReadHeaderTimeout duration `json:"readHeaderTimeout" validate:"required"`
+	ReadTimeout       duration `json:"readTimeout"       validate:"required"`
+	WriteTimeout      duration `json:"writeTimeout"      validate:"required"`
+	AllowedOrigins    []string `json:"allowedOrigins"    validate:"required,min=1"`
 }
 
 type websocketConfig struct {
-	ReadLimit      int64         `json:"readLimit"            validate:"required"`
-	Timeout        time.Duration `json:"timeout,format:units" validate:"required"`
-	OriginPatterns []string      `json:"originPatterns"       validate:"required,min=1"`
+	ReadLimit      int64    `json:"readLimit"      validate:"required"`
+	Timeout        duration `json:"timeout"        validate:"required"`
+	OriginPatterns []string `json:"originPatterns" validate:"required,min=1"`
 }
 
 type config struct {
@@ -77,16 +93,16 @@ func defaultConfig() *config {
 			Address:           "localhost:8080",
 			MaxBytesReader:    16 << 10,
 			MaxHeaderBytes:    4 << 10,
-			IdleTimeout:       30 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
-			ReadTimeout:       10 * time.Second,
-			WriteTimeout:      30 * time.Second,
+			IdleTimeout:       duration{30 * time.Second},
+			ReadHeaderTimeout: duration{5 * time.Second},
+			ReadTimeout:       duration{10 * time.Second},
+			WriteTimeout:      duration{30 * time.Second},
 			AllowedOrigins:    []string{"*"},
 		},
 
 		WS: &websocketConfig{
 			ReadLimit:      16 << 10,
-			Timeout:        180 * time.Second,
+			Timeout:        duration{180 * time.Second},
 			OriginPatterns: []string{"*"},
 		},
 
