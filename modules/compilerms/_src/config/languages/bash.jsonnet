@@ -51,10 +51,10 @@ local compilerms = import '../compilerms.libsonnet';
   program: {
     local cfgProgram = {
       displayName: '/usr/bin/bash',
-      shliteEnvs: [],
+      shliteEnvs: ['PATH'],
       maxBytesInput: 8 << 10,
       maxBytesOutput: 16 << 10,
-      args: ['/usr/bin/bash', '/rodir/main.sh'],
+      args: ['/usr/bin/bash', '--noprofile', '--norc', '/rodir/main.sh'],
 
       systemdRunFlags: std.flattenArrays([
         ['--property', 'BindPaths={{ COMPILERMS_RUNDIR }}:/rundir'],
@@ -64,6 +64,7 @@ local compilerms = import '../compilerms.libsonnet';
         ['--property', 'BindReadOnlyPaths=/usr/lib'],
         ['--property', 'BindReadOnlyPaths=/usr/lib64'],
         ['--property', 'BindReadOnlyPaths={{ COMPILERMS_RODIR }}:/rodir'],
+        ['--property', 'Environment=PATH=/usr/bin'],
         ['--property', 'WorkingDirectory=/rundir'],
         ['--property', |||
           SystemCallFilter=
@@ -118,7 +119,7 @@ local compilerms = import '../compilerms.libsonnet';
     batch: compilerms.MkProgram(cfgProgram),
 
     live: compilerms.MkProgram(cfgProgram {
-      args: ['/usr/bin/bash'],
+      args: cfgProgram.args[:-1],
       systemdRunFlags+: ['--property', 'RuntimeMaxSec=180'],
     }),
   },
