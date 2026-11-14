@@ -248,6 +248,36 @@ func runStep(
 	return &runStepResponse{status: 0}, nil
 }
 
+func runLanguageVersions(
+	ctx context.Context,
+	langCfg *langConfig,
+) (map[string]string, error) {
+	var (
+		langVersions map[string]string
+		cmdName      string
+		cmdCfg       *cmdConfig
+		output       []byte
+		err          error
+	)
+
+	langVersions = make(map[string]string, len(langCfg.Versions))
+
+	for cmdName, cmdCfg = range langCfg.Versions {
+		output, err = newCommand(
+			ctx,
+			cmdCfg.Name,
+			cmdCfg.Args...,
+		).CombinedOutput()
+		if err != nil {
+			return nil, err
+		}
+
+		langVersions[cmdName] = string(output)
+	}
+
+	return langVersions, nil
+}
+
 type runVersionsRequest struct {
 	cfg *config
 }
@@ -261,30 +291,20 @@ func runVersions(
 	req *runVersionsRequest,
 ) (*runVersionsResponse, error) {
 	var (
-		resp              *runVersionsResponse
-		langName, cmdName string
-		langCfg           *langConfig
-		cmdCfg            *cmdConfig
-		output            []byte
-		err               error
+		resp     *runVersionsResponse
+		langName string
+		langCfg  *langConfig
+		err      error
 	)
 
-	resp = &runVersionsResponse{Versions: make(map[string]map[string]string)}
+	resp = &runVersionsResponse{
+		Versions: make(map[string]map[string]string, len(req.cfg.Languages)),
+	}
 
 	for langName, langCfg = range req.cfg.Languages {
-		resp.Versions[langName] = make(map[string]string)
-
-		for cmdName, cmdCfg = range langCfg.Versions {
-			output, err = newCommand(
-				ctx,
-				cmdCfg.Name,
-				cmdCfg.Args...,
-			).CombinedOutput()
-			if err != nil {
-				return nil, err
-			}
-
-			resp.Versions[langName][cmdName] = string(output)
+		resp.Versions[langName], err = runLanguageVersions(ctx, langCfg)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -301,8 +321,9 @@ type runLiveRequest struct {
 }
 
 type runLiveResponse struct {
-	Name   string `json:"name"`
-	Status int    `json:"status"`
+	Versions map[string]string `json:"versions"`
+	Name     string            `json:"name"`
+	Status   int               `json:"status"`
 }
 
 func runLive(
@@ -310,9 +331,10 @@ func runLive(
 	req *runLiveRequest,
 ) (*runLiveResponse, error) {
 	var (
-		tmpDir      string
-		runStepResp *runStepResponse
-		err         error
+		tmpDir   string
+		resp     *runStepResponse
+		versions map[string]string
+		err      error
 	)
 
 	tmpDir, err = mkTmpFiles(req.langCfg, req.Files)
@@ -323,7 +345,7 @@ func runLive(
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	if req.langCfg.Compiler != nil {
-		runStepResp, err = runStep(ctx, &runStepRequest{
+		resp, err = runStep(ctx, &runStepRequest{
 			stepCfg: req.langCfg.Compiler,
 			tmpDir:  tmpDir,
 			input:   nil,
@@ -334,15 +356,15 @@ func runLive(
 			return nil, err
 		}
 
-		if runStepResp.status != 0 {
+		if resp.status != 0 {
 			return &runLiveResponse{
 				Name:   req.langCfg.Compiler.DisplayName,
-				Status: runStepResp.status,
+				Status: resp.status,
 			}, nil
 		}
 	}
 
-	runStepResp, err = runStep(ctx, &runStepRequest{
+	resp, err = runStep(ctx, &runStepRequest{
 		stepCfg: req.stepCfg,
 		tmpDir:  tmpDir,
 		input:   req.input,
@@ -353,9 +375,15 @@ func runLive(
 		return nil, err
 	}
 
+	versions, err = runLanguageVersions(ctx, req.langCfg)
+	if err != nil {
+		return nil, err
+	}
+
 	return &runLiveResponse{
-		Name:   req.stepCfg.DisplayName,
-		Status: runStepResp.status,
+		Versions: versions,
+		Name:     req.stepCfg.DisplayName,
+		Status:   resp.status,
 	}, nil
 }
 
@@ -367,9 +395,10 @@ type runBatchRequest struct {
 }
 
 type runBatchResponse struct {
-	Name   string `json:"name"`
-	Output string `json:"output"`
-	Status int    `json:"status"`
+	Versions map[string]string `json:"versions"`
+	Name     string            `json:"name"`
+	Output   string            `json:"output"`
+	Status   int               `json:"status"`
 }
 
 func runBatch(
@@ -395,8 +424,9 @@ func runBatch(
 	}
 
 	return &runBatchResponse{
-		Name:   resp.Name,
-		Output: output.String(),
-		Status: resp.Status,
+		Versions: resp.Versions,
+		Name:     resp.Name,
+		Output:   output.String(),
+		Status:   resp.Status,
 	}, nil
 }

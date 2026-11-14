@@ -1,6 +1,6 @@
 {
   http: {
-    address: 'localhost:20266',
+    address: 'localhost:8080',
   },
 
   languages: {

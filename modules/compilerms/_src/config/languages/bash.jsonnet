@@ -73,18 +73,21 @@ local compilerms = import '../compilerms.libsonnet';
             brk
             clone
             close
+            connect
             execve
             fcntl
             fstat
             futex
             getcwd
+            getegid
+            geteuid
+            getgid
             getpgrp
             getpid
             getppid
             getrandom
-            getresgid
-            getresuid
             gettid
+            getuid
             ioctl
             lseek
             madvise
@@ -105,22 +108,23 @@ local compilerms = import '../compilerms.libsonnet';
             rt_sigprocmask
             rt_sigreturn
             sched_getaffinity
-            sched_yield
             set_robust_list
             set_tid_address
             sigaltstack
-            tgkill
+            socket
             uname
+            wait4
             waitid
+            write
         |||],
       ]),
     },
-
-    batch: compilerms.MkProgram(cfgProgram),
 
     live: compilerms.MkProgram(cfgProgram {
       args: cfgProgram.args[:-1],
       systemdRunFlags+: ['--property', 'RuntimeMaxSec=180'],
     }),
+
+    batch: compilerms.MkProgram(cfgProgram),
   },
 }

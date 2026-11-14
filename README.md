@@ -32,8 +32,9 @@ name of the program.
 
 ```go
 GET /{language} :: struct { files map[string]string } -> struct {
-  name   string
-  status int
+  versions map[string]string
+  name     string
+  status   int
 }
 ```
 
@@ -47,9 +48,10 @@ POST /{language} :: struct {
   files map[string]string;
   input string;
 } -> struct {
-  name   string;
-  output string;
-  status int;
+  versions map[string]string
+  name     string
+  output   string
+  status   int
 }
 ```
 
