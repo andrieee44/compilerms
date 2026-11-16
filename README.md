@@ -27,8 +27,8 @@ GET / -> struct { versions map[string]map[string]string }
 `GET /{language}` is live mode. After the WebSocket connection is established,
 the client first sends a JSON message containing the files, and then exchanges
 binary messages for input and output. The server returns the program output as
-binary messages, followed by a JSON message containing the exit status and the
-name of the program.
+binary messages, followed by a JSON message containing the version(s) of the
+program(s) used, its exit status, and the name of the program.
 
 ```go
 GET /{language} :: struct { files map[string]string } -> struct {
