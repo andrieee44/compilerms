@@ -49,10 +49,6 @@
     enable = true;
 
     config.programs = {
-      # Bash
-      shellcheck.enable = true;
-      shfmt.enable = true;
-
       # Go
       gofmt.enable = true;
 
