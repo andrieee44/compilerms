@@ -1,6 +1,6 @@
 module github.com/andrieee44/compilerms/modules/compilerms
 
-go 1.26.10
+go 1.27.3
 
 require (
 	github.com/cli/go-gh/v2 v2.17.0

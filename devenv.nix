@@ -1,7 +1,5 @@
 { config, pkgs, ... }:
 {
-  env.GOEXPERIMENT = "jsonv2";
-
   git-hooks.hooks = {
     # Go
     golangci-lint.enable = true;
