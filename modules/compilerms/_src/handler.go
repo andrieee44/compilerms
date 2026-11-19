@@ -1,14 +1,53 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json/v2"
+	"io"
 	"net"
 	"net/http"
 
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )
+
+type eofReader struct {
+	r   io.Reader
+	eof bool
+}
+
+func (r *eofReader) Read(p []byte) (int, error) {
+	var (
+		n, ctrlD int
+		err      error
+	)
+
+	if r.eof {
+		return 0, io.EOF
+	}
+
+	n, err = r.r.Read(p)
+	if err != nil {
+		return n, err
+	}
+
+	ctrlD = bytes.IndexByte(p[:n], 0x04)
+	if ctrlD != -1 {
+		r.eof = true
+
+		return ctrlD, io.EOF
+	}
+
+	return n, nil
+}
+
+func newEOFReader(r io.Reader) *eofReader {
+	return &eofReader{
+		r:   r,
+		eof: false,
+	}
+}
 
 func newVersionsHandler(cfg *config) http.Handler {
 	return newJSONHandler(func(
@@ -52,7 +91,7 @@ func newLiveHandler(wsCfg *websocketConfig, langCfg *langConfig) http.Handler {
 
 		req.langCfg = langCfg
 		req.stepCfg = langCfg.Program.Live
-		req.input = netConn
+		req.input = newEOFReader(netConn)
 		req.output = netConn
 		req.debug = false
 
